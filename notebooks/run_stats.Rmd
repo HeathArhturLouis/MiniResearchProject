@@ -1,0 +1,240 @@
+
+# Install Required Packages
+```{r, warning=FALSE}
+#install.packages("ggpubr")
+install.packages("tidyverse",dependencies=T)
+install.packages("plot.matrix")
+```
+
+# Load Libraries
+
+```{r, warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(ggpubr)
+library(plot.matrix)
+```
+
+# Load Data
+
+```{r}
+bert_test <- read_excel(path="BERT_Test.xlsx")
+vader_test <- read_excel(path="VADER_Test.xlsx")
+bert_train <- read_excel(path="BERT_Train.xlsx")
+
+# Change Accuracy to %
+bert_test$ACCURACY <- bert_test$ACCURACY * 100
+vader_test$ACCURACY <- vader_test$ACCURACY * 100
+
+#View(bert_test)
+#View(vader_test)
+#View(bert_train)
+```
+
+# Check Misc Statistics for Python code
+
+```{r}
+
+sd(bert_train$ACCURACY_1 * 100)
+sd(bert_train$ACCURACY_2  * 100)
+sd(bert_train$ACCURACY_3  * 100)
+
+sd(bert_train$LOSS_1)
+sd(bert_train$LOSS_2)
+sd(bert_train$LOSS_3)
+
+
+```
+
+
+# Calculate and plot average performance for each metric (w/ error)
+
+```{r}
+# Generate barplot for Accuracy
+
+acc_df = rbind(cbind(bert_test$ACCURACY, 
+                     rep("BERT", 
+                         length(bert_test$ACCURACY))),
+               cbind(vader_test$ACCURACY,
+                     rep("VADER",
+                         length(vader_test$ACCURACY))))
+
+colnames(acc_df) <- c("ACCURACY", "MODEL" )
+acc_df <- as.data.frame(acc_df)
+acc_df$ACCURACY <- as.numeric(as.character(acc_df$ACCURACY))
+
+acc_bars = ggbarplot(acc_df,
+          x = "MODEL", y = "ACCURACY",
+          add="mean_se",
+          ylab = "ACCURACY (%)",
+          label = TRUE, lab.vjust=-2, 
+          lab.nb.digits	= 3,
+          fill = "MODEL",
+          color = "#000000",
+          palette = c("#00AFBB", "#FC4E07")) + 
+  guides(fill=FALSE) +
+  ylim(0, 100)
+
+
+# Generate barplot for Precision
+
+pre_df = rbind(cbind(bert_test$PRECISION, 
+                     rep("BERT", 
+                         length(bert_test$PRECISION))),
+               cbind(vader_test$PRECISION,
+                     rep("VADER",
+                         length(vader_test$PRECISION))))
+
+colnames(pre_df) <- c("PRECISION", "MODEL" )
+pre_df <- as.data.frame(pre_df)
+pre_df$PRECISION <- as.numeric(as.character(pre_df$PRECISION))
+
+pre_bars = ggbarplot(pre_df,
+          x = "MODEL", y = "PRECISION",
+          add="mean_se",
+          label = TRUE, lab.vjust=-2, 
+          lab.nb.digits	= 3,
+          fill = "MODEL",
+          color = "#000000",
+          palette = c("#00AFBB", "#FC4E07")) + 
+  guides(fill=FALSE) +
+  ylim(0, 1)
+
+# Generate Recall Bar Chart
+
+rec_df = rbind(cbind(bert_test$RECALL, 
+                     rep("BERT", 
+                         length(bert_test$RECALL))),
+               cbind(vader_test$RECALL,
+                     rep("VADER",
+                         length(vader_test$RECALL))))
+
+colnames(rec_df) <- c("RECALL", "MODEL" )
+rec_df <- as.data.frame(rec_df)
+rec_df$RECALL <- as.numeric(as.character(rec_df$RECALL))
+
+rec_bars = ggbarplot(rec_df,
+          x = "MODEL", y = "RECALL",
+          add="mean_se",
+          label = TRUE, lab.vjust=-2, 
+          lab.nb.digits	= 3,
+          fill = "MODEL",
+          color = "#000000",
+          palette = c("#00AFBB", "#FC4E07")) + 
+  guides(fill=FALSE) +
+  ylim(0, 1)
+
+
+# Generate barplot for F1 Score
+
+f1_df = rbind(cbind(bert_test$F1SCORE, 
+                     rep("BERT", 
+                         length(bert_test$F1SCORE))),
+               cbind(vader_test$F1,
+                     rep("VADER",
+                         length(vader_test$F1))))
+
+colnames(f1_df) <- c("F1", "MODEL" )
+f1_df <- as.data.frame(f1_df)
+f1_df$F1 <- as.numeric(as.character(f1_df$F1))
+
+f1_bars = ggbarplot(f1_df,
+          x = "MODEL", y = "F1",
+          add="mean_se",
+          label = TRUE, lab.vjust=-2, 
+          lab.nb.digits	= 3,
+          fill = "MODEL",
+          color = "#000000",
+          palette = c("#00AFBB", "#FC4E07")) + 
+  guides(fill=FALSE) +
+  ylim(0, 1)
+  
+```
+
+
+```{r}
+
+metric_charts <- ggarrange(acc_bars, pre_bars, rec_bars, f1_bars, ncol = 2, nrow = 2)
+
+metric_charts
+
+ggexport(metric_charts, filename="metric_charts.png", width = 480, height = 480)
+
+```
+
+# Plot Non-Normal Distributions
+
+
+```{r}
+# Plot BERT Accuracy and F1
+acc_dis <- ggplot(bert_test, aes(x=ACCURACY)) +
+          geom_density(alpha=.5, fill="#00AFBB") + 
+          xlim(85, 95) + 
+          labs(title = "BERT ACCURACY MEASURMENT DISTRIBUTION",
+               x = "ACCURACY (%)", y = "DENSITY")
+
+f1_dis <- ggplot(bert_test, aes(x=F1SCORE),) + 
+          geom_density(alpha=.5, fill="#00AFBB") + 
+          xlim(0.85, 0.95) + 
+          ylim(0, 100) +
+          labs(title = "BERT F1 SCORE MEASURMENT DISTRIBUTION",
+                      x = "F1 SCORE", y = "DENSITY")
+
+distributions <- ggarrange(acc_dis, f1_dis, nrow = 2, ncol = 1)
+distributions
+ggexport(distributions, filename="odd_distributions.png", width = 500, height = 300)
+
+```
+
+# Create confusion matrixes
+
+
+# Average all run's confusion matrixes and normalize
+```{r}
+
+# construct color palettes
+cp_bert <- colorRampPalette(c("#BFEBEE", "#00AFBB"))
+cp_vader <-  colorRampPalette(c("#FED2C1", "#FC4E07"))
+
+#
+#  TP   FN
+#  FP   TN
+#   
+
+b_vals = c(mean(bert_test$TP),mean(bert_test$FN),mean(bert_test$FP),mean(bert_test$TN))
+
+b_vals
+
+# normalise
+b_vals <- b_vals / sum(b_vals) * 100
+b_matrix <- matrix(b_vals, nrow=2) # create a numeric matrix object
+rownames(b_matrix) = c("POS" , "NEG")
+colnames(b_matrix) = c("POS" , "NEG")
+
+v_vals = c(mean(vader_test$TP),mean(vader_test$FN),mean(vader_test$FP),mean(vader_test$TN))
+
+# normalise
+v_vals <- v_vals / sum(v_vals) * 100
+v_matrix <- matrix(v_vals, nrow=2) # create a numeric matrix object
+rownames(v_matrix) = c("POS" , "NEG")
+colnames(v_matrix) = c("POS" , "NEG")
+
+v_cmat_plot <- plot(v_matrix, fmt.cell='%.2f', 
+     main="VADER CONFUSION MATRIX (%)",
+     col = cp_vader,
+     key=NULL,
+     xlab = "TRUE LABEL", ylab = "PREDICTED LABEL")
+
+b_cmat_plot <- plot(b_matrix, fmt.cell='%.2f',
+     main="BERT CONFUSION MATRIX (%)",
+     col = cp_bert,
+     key=NULL,
+     xlab = "TRUE LABEL", ylab = " PREDICTED")
+
+v_cmat_plot
+b_cmat_plot
+
+```
+
+
+
